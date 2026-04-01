@@ -1,5 +1,6 @@
 struct VolumeUniforms {
     mvp: mat4x4<f32>,
+    inv_mvp: mat4x4<f32>,
     world_to_volume: mat4x4<f32>,
     volume_to_world: mat4x4<f32>,
 

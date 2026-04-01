@@ -755,6 +755,7 @@ impl VolumeRenderer {
         let view = camera.view_matrix();
         let proj = camera.projection_matrix(aspect);
         let mvp = (proj * view).as_mat4();
+        let inv_mvp = (proj * view).inverse().as_mat4();
 
         let blend_mode = match params.blend_mode {
             BlendMode::Composite => bm::COMPOSITE,
@@ -796,6 +797,7 @@ impl VolumeRenderer {
 
         VolumeUniforms {
             mvp: mvp.to_cols_array_2d(),
+            inv_mvp: inv_mvp.to_cols_array_2d(),
             world_to_volume: metadata.world_to_volume,
             volume_to_world: metadata.volume_to_world,
             dimensions: [

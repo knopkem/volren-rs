@@ -53,35 +53,30 @@ fn is_clipped(pos_world: vec3<f32>) -> bool {
 
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
-    // Reconstruct ray in world space from the NDC position.
-    // Camera position is in world space (from uniform).
-    let ndc      = vec4<f32>(in.clip_pos.x, in.clip_pos.y, 0.0, 1.0);
-    // We use a proxy: fire the ray from camera toward the near-plane fragment.
-    // For the raycaster we simply use camera_position as ray origin and
-    // compute ray direction via inverse MVP.
-    let inv_mvp  = u.volume_to_world * u.world_to_volume; // placeholder — simplified
+    // Reconstruct NDC coordinates from the full-screen-quad UV.
+    //   uv  is in [0, 1]  (left→right, top→bottom)
+    //   NDC is in [-1, 1] (left→right, bottom→top), depth [0, 1] in wgpu
+    let ndc_x = in.uv.x * 2.0 - 1.0;
+    let ndc_y = 1.0 - in.uv.y * 2.0;
 
-    let cam_world = u.camera_position.xyz;
+    // Unproject near (z=0) and far (z=1) clip-space points to world space
+    // using the inverse model-view-projection matrix.
+    let near_clip = vec4<f32>(ndc_x, ndc_y, 0.0, 1.0);
+    let far_clip  = vec4<f32>(ndc_x, ndc_y, 1.0, 1.0);
 
-    // Map NDC xy → view space ray direction
-    // clip pos is in pixels; ndc_xy is in [-1,1]
-    let ndc_xy = vec2<f32>(in.clip_pos.x, in.clip_pos.y);
+    let near_world4 = u.inv_mvp * near_clip;
+    let far_world4  = u.inv_mvp * far_clip;
 
-    // Direction in volume texture space: unproject from screen
-    // We derive a ray direction in texture space by transforming two points.
-    // Near point: ndc at z=0 depth
-    let near_ndc   = vec4<f32>(ndc_xy * 2.0 - vec2<f32>(1.0), 0.0, 1.0);
+    let near_world = near_world4.xyz / near_world4.w;
+    let far_world  = far_world4.xyz / far_world4.w;
 
-    // Convert camera position to texture space
+    // Ray direction in world space, then transform to volume texture [0,1]³.
+    let ray_dir_world = normalize(far_world - near_world);
+    let cam_world     = u.camera_position.xyz;
+
     let cam_vol4   = u.world_to_volume * vec4<f32>(cam_world, 1.0);
     let cam_vol    = cam_vol4.xyz / cam_vol4.w;
-
-    // Build ray direction in texture space from camera toward this fragment.
-    // Fragment world position is on the near plane of the AABB proxy geometry.
-    // For a simple raycaster we project the screen UV to an AABB face.
-    let frag_tc    = vec3<f32>(in.uv.x, 1.0 - in.uv.y, 0.0); // axial slice at Z=0 face
-
-    var rd_vol     = normalize(frag_tc - cam_vol);
+    var rd_vol     = normalize((u.world_to_volume * vec4<f32>(ray_dir_world, 0.0)).xyz);
     let ro_vol     = cam_vol;
     let inv_rd_vol = vec3<f32>(1.0) / rd_vol;
 

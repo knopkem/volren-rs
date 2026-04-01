@@ -14,6 +14,8 @@ use bytemuck::{Pod, Zeroable};
 pub(crate) struct VolumeUniforms {
     /// Model-view-projection matrix (column-major, f32).
     pub mvp: [[f32; 4]; 4],
+    /// Inverse model-view-projection matrix for screen-to-world ray unprojection.
+    pub inv_mvp: [[f32; 4]; 4],
     /// World-to-volume-texture-space matrix.
     pub world_to_volume: [[f32; 4]; 4],
     /// Volume-to-world matrix (inverse of world_to_volume).
