@@ -1,0 +1,5 @@
+# Build artifacts
+/target/
+
+# Cargo lock file (omit for library crates; keep for application crates)
+Cargo.lock

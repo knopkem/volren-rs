@@ -1,0 +1,41 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/volren-core",
+    "crates/volren-gpu",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT OR Apache-2.0"
+authors = []
+
+[workspace.dependencies]
+# Internal
+volren-core = { path = "crates/volren-core", version = "0.1.0" }
+
+# Math
+glam = { version = "0.29", features = ["bytemuck", "debug-glam-assert"] }
+
+# GPU buffer safety
+bytemuck = { version = "1", features = ["derive"] }
+
+# Error handling
+thiserror = "2"
+
+# GPU abstraction
+wgpu = { version = "24", features = ["spirv"] }
+
+# Testing
+proptest = "1"
+approx = "0.5"
+pollster = "0.4"
+
+[profile.dev]
+opt-level = 1  # Slightly optimise dev builds — helps with GPU test perf
+
+[profile.release]
+lto = true
+codegen-units = 1
