@@ -1,38 +1,21 @@
 //! GPU volume texture management.
 
-use volren_core::volume::DynVolume;
+use half::f16;
+use volren_core::volume::{DynVolume, VolumeInfo};
 
-/// Describes how a volume's scalars are represented in the GPU texture.
+/// The GPU texture format used for uploaded volumes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GpuTextureFormat {
-    /// 8-bit unsigned normalised.
-    R8Unorm,
-    /// 16-bit unsigned normalised.
-    R16Unorm,
-    /// 16-bit signed integer.
-    R16Sint,
-    /// 32-bit float.
-    R32Float,
+    /// Single-channel 16-bit floating-point texture.
+    R16Float,
 }
 
 impl GpuTextureFormat {
-    /// Select the appropriate texture format for the given volume's scalar type.
-    pub fn for_volume(vol: &DynVolume) -> Self {
-        match vol {
-            DynVolume::U8(_) => Self::R8Unorm,
-            DynVolume::I8(_) | DynVolume::U16(_) => Self::R16Unorm,
-            DynVolume::I16(_) => Self::R16Sint,
-            _ => Self::R32Float,
-        }
-    }
-
     /// Convert to the corresponding `wgpu::TextureFormat`.
+    #[must_use]
     pub fn to_wgpu(self) -> wgpu::TextureFormat {
         match self {
-            Self::R8Unorm => wgpu::TextureFormat::R8Unorm,
-            Self::R16Unorm => wgpu::TextureFormat::R16Unorm,
-            Self::R16Sint => wgpu::TextureFormat::R16Sint,
-            Self::R32Float => wgpu::TextureFormat::R32Float,
+            Self::R16Float => wgpu::TextureFormat::R16Float,
         }
     }
 }
@@ -46,23 +29,25 @@ pub(crate) struct GpuVolumeTexture {
     pub view: wgpu::TextureView,
     /// The sampler (linear or nearest).
     pub sampler: wgpu::Sampler,
+    /// The underlying GPU texture format.
+    pub format: wgpu::TextureFormat,
+    /// Texture dimensions in voxels.
+    pub dimensions: glam::UVec3,
 }
 
 impl GpuVolumeTexture {
     /// Upload a [`DynVolume`] to the GPU as a 3D texture.
     ///
-    /// Existing GPU state is released when this value is dropped.
+    /// All scalar types are converted to half-precision floating point so the
+    /// shader can sample a single consistent texture format.
     pub fn upload(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         volume: &DynVolume,
         linear: bool,
     ) -> Self {
-        use volren_core::volume::VolumeInfo;
-
         let dims = volume.dimensions();
-        let format = GpuTextureFormat::for_volume(volume);
-
+        let format = GpuTextureFormat::R16Float.to_wgpu();
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("volren_volume_3d"),
             size: wgpu::Extent3d {
@@ -73,28 +58,45 @@ impl GpuVolumeTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
-            format: format.to_wgpu(),
+            format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
 
-        let bytes = volume.as_bytes();
-        let bytes_per_component = volume.bytes_per_component();
+        let voxels = to_f16_bits(volume);
+        let slice_len = (dims.x * dims.y) as usize;
+        let max_chunk_depth =
+            ((4 * 1024 * 1024) / (slice_len.max(1) * std::mem::size_of::<u16>())).max(1) as u32;
+        let bytes_per_row = dims.x * std::mem::size_of::<u16>() as u32;
 
-        queue.write_texture(
-            texture.as_image_copy(),
-            bytes,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(dims.x * bytes_per_component as u32),
-                rows_per_image: Some(dims.y),
-            },
-            wgpu::Extent3d {
-                width: dims.x,
-                height: dims.y,
-                depth_or_array_layers: dims.z,
-            },
-        );
+        for chunk_start in (0..dims.z).step_by(max_chunk_depth as usize) {
+            let chunk_depth = (dims.z - chunk_start).min(max_chunk_depth);
+            let start = chunk_start as usize * slice_len;
+            let end = start + chunk_depth as usize * slice_len;
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d {
+                        x: 0,
+                        y: 0,
+                        z: chunk_start,
+                    },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                bytemuck::cast_slice(&voxels[start..end]),
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(dims.y),
+                },
+                wgpu::Extent3d {
+                    width: dims.x,
+                    height: dims.y,
+                    depth_or_array_layers: chunk_depth,
+                },
+            );
+        }
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D3),
@@ -106,7 +108,6 @@ impl GpuVolumeTexture {
         } else {
             wgpu::FilterMode::Nearest
         };
-
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("volren_volume_sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -118,6 +119,58 @@ impl GpuVolumeTexture {
             ..Default::default()
         });
 
-        Self { texture, view, sampler }
+        Self {
+            texture,
+            view,
+            sampler,
+            format,
+            dimensions: dims,
+        }
+    }
+}
+
+fn to_f16_bits(volume: &DynVolume) -> Vec<u16> {
+    match volume {
+        DynVolume::U8(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(f32::from(value)).to_bits())
+            .collect(),
+        DynVolume::I8(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(f32::from(value)).to_bits())
+            .collect(),
+        DynVolume::U16(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(value as f32).to_bits())
+            .collect(),
+        DynVolume::I16(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(f32::from(value)).to_bits())
+            .collect(),
+        DynVolume::U32(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(value as f32).to_bits())
+            .collect(),
+        DynVolume::I32(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(value as f32).to_bits())
+            .collect(),
+        DynVolume::F32(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(value).to_bits())
+            .collect(),
+        DynVolume::F64(v) => v
+            .data()
+            .iter()
+            .map(|&value| f16::from_f32(value as f32).to_bits())
+            .collect(),
+        _ => unreachable!("all current DynVolume variants are handled"),
     }
 }

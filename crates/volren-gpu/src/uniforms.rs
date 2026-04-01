@@ -60,6 +60,8 @@ pub(crate) struct VolumeUniforms {
 
     /// Up to 6 world-space clip planes `(nx, ny, nz, d)` each.
     pub clip_planes: [[f32; 4]; 6],
+    /// Background colour used when no sample contributes.
+    pub background: [f32; 4],
 }
 
 /// Blend mode constants that map to shader integer codes.

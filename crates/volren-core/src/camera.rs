@@ -63,6 +63,20 @@ impl Default for Camera {
 impl Camera {
     // ── Construction ──────────────────────────────────────────────────────────
 
+    /// Create a perspective camera with a conventional Y-up configuration.
+    #[must_use]
+    pub fn new_perspective(position: DVec3, focal_point: DVec3, fov_y_deg: f64) -> Self {
+        Self::new(position, focal_point, DVec3::Y)
+            .with_projection(Projection::Perspective { fov_y_deg })
+    }
+
+    /// Create an orthographic camera with a conventional Y-up configuration.
+    #[must_use]
+    pub fn new_orthographic(position: DVec3, focal_point: DVec3, parallel_scale: f64) -> Self {
+        Self::new(position, focal_point, DVec3::Y)
+            .with_projection(Projection::Orthographic { parallel_scale })
+    }
+
     /// Build a new camera pointed at `focal_point` from `position` with view-up `view_up`.
     ///
     /// The clip range defaults to `(0.01, 1000.0)` and can be adjusted with
@@ -113,10 +127,24 @@ impl Camera {
         (self.focal_point - self.position).normalize_or(DVec3::NEG_Z)
     }
 
+    /// Alias for [`Self::forward`], matching the plan terminology.
+    #[must_use]
+    pub fn direction(&self) -> DVec3 {
+        self.forward()
+    }
+
     /// Orthogonalised right vector (forward × up).
     #[must_use]
     pub fn right(&self) -> DVec3 {
-        self.forward().cross(self.view_up_ortho()).normalize_or(DVec3::X)
+        self.forward()
+            .cross(self.view_up_ortho())
+            .normalize_or(DVec3::X)
+    }
+
+    /// Alias for [`Self::right`], matching VTK-style naming.
+    #[must_use]
+    pub fn right_vector(&self) -> DVec3 {
+        self.right()
     }
 
     /// Orthogonalised view-up vector.
@@ -205,6 +233,13 @@ impl Camera {
         self.focal_point += delta;
     }
 
+    /// Translate the camera in its view plane.
+    ///
+    /// `dx` moves along the camera right vector, `dy` along the orthogonal up vector.
+    pub fn pan_view(&mut self, dx: f64, dy: f64) {
+        self.pan(self.right() * dx + self.view_up_ortho() * dy);
+    }
+
     /// Rotate the camera position around the focal point about the world Y axis.
     ///
     /// This is a convenience wrapper around [`Camera::orbit`].
@@ -266,7 +301,10 @@ impl Camera {
         self.position = center - fwd * dist;
         self.clip_range = ((dist - half_diag * 1.5).max(1e-3), dist + half_diag * 1.5);
 
-        if let Projection::Orthographic { ref mut parallel_scale } = self.projection {
+        if let Projection::Orthographic {
+            ref mut parallel_scale,
+        } = self.projection
+        {
             *parallel_scale = half_diag;
         }
     }
@@ -346,7 +384,10 @@ mod tests {
         let mut cam = Camera::new(DVec3::new(0.0, 0.0, 5.0), DVec3::ZERO, DVec3::Y);
         let y0 = cam.position().y;
         cam.elevation(30.0);
-        assert!((cam.position().y - y0).abs() > 0.1, "elevation should move camera vertically");
+        assert!(
+            (cam.position().y - y0).abs() > 0.1,
+            "elevation should move camera vertically"
+        );
     }
 
     #[test]
@@ -355,7 +396,10 @@ mod tests {
         let r0 = cam.right();
         cam.roll(45.0);
         let r1 = cam.right();
-        assert!((r1 - r0).length() > 0.1, "roll should change the right vector");
+        assert!(
+            (r1 - r0).length() > 0.1,
+            "roll should change the right vector"
+        );
     }
 }
 

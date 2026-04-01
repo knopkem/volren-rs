@@ -85,15 +85,11 @@ pub enum KeyEvent {
     Pressed {
         /// Which key.
         key: Key,
-        /// Modifier keys held.
-        modifiers: Modifiers,
     },
     /// A key was released.
     Released {
         /// Which key.
         key: Key,
-        /// Modifier keys held.
-        modifiers: Modifiers,
     },
 }
 
@@ -154,7 +150,11 @@ impl InteractionResult {
     /// Convenience: only the camera changed.
     #[must_use]
     pub fn camera_only() -> Self {
-        Self { camera_changed: true, needs_redraw: true, ..Self::default() }
+        Self {
+            camera_changed: true,
+            needs_redraw: true,
+            ..Self::default()
+        }
     }
 
     /// Convenience: nothing changed.
@@ -166,12 +166,20 @@ impl InteractionResult {
     /// Convenience: window/level changed.
     #[must_use]
     pub fn window_level_only() -> Self {
-        Self { window_level_changed: true, needs_redraw: true, ..Self::default() }
+        Self {
+            window_level_changed: true,
+            needs_redraw: true,
+            ..Self::default()
+        }
     }
 
     /// Convenience: slice changed.
     #[must_use]
     pub fn slice_only() -> Self {
-        Self { slice_changed: true, needs_redraw: true, ..Self::default() }
+        Self {
+            slice_changed: true,
+            needs_redraw: true,
+            ..Self::default()
+        }
     }
 }

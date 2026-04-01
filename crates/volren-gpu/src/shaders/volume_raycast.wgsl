@@ -13,76 +13,6 @@
 //  • Texture: [0,1]³   — volume texture UVW
 // ────────────────────────────────────────────────────────────────────────────
 
-// ── Uniform buffer ────────────────────────────────────────────────────────────
-
-struct VolumeUniforms {
-    mvp:            mat4x4<f32>,
-    world_to_volume: mat4x4<f32>,
-    volume_to_world: mat4x4<f32>,
-
-    dimensions:   vec4<f32>,
-    spacing:      vec4<f32>,
-    scalar_range: vec4<f32>,   // (min, max, _, _)
-
-    step_size:          f32,
-    opacity_correction: f32,
-    blend_mode:         u32,
-    shading_enabled:    u32,
-
-    ambient:          f32,
-    diffuse:          f32,
-    specular:         f32,
-    specular_power:   f32,
-
-    light_position:  vec4<f32>,
-    camera_position: vec4<f32>,
-
-    window_center:    f32,
-    window_width:     f32,
-    num_clip_planes:  u32,
-    _pad0:            u32,
-
-    clip_planes:     array<vec4<f32>, 6>,
-};
-
-@group(0) @binding(0) var<uniform>  u:          VolumeUniforms;
-@group(0) @binding(1) var           vol_tex:    texture_3d<f32>;
-@group(0) @binding(2) var           vol_samp:   sampler;
-@group(0) @binding(3) var           lut_tex:    texture_1d<f32>;
-@group(0) @binding(4) var           lut_samp:   sampler;
-
-// ── Blend mode constants ──────────────────────────────────────────────────────
-
-const BLEND_COMPOSITE:          u32 = 0u;
-const BLEND_MAX_INTENSITY:      u32 = 1u;
-const BLEND_MIN_INTENSITY:      u32 = 2u;
-const BLEND_AVERAGE_INTENSITY:  u32 = 3u;
-const BLEND_ADDITIVE:           u32 = 4u;
-const BLEND_ISOSURFACE:         u32 = 5u;
-
-const OPACITY_EARLY_EXIT: f32 = 0.99;
-const MAX_STEPS:          u32 = 2000u;
-
-// ── Vertex shader ─────────────────────────────────────────────────────────────
-// Generates a full-screen triangle pair without a vertex buffer.
-// Vertex indices 0-5 produce two triangles covering NDC [-1,1]².
-
-struct VertexOut {
-    @builtin(position) clip_pos: vec4<f32>,
-    @location(0)       uv:       vec2<f32>,
-};
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VertexOut {
-    // Two triangles: 0,1,2 and 3,4,5
-    let x = select(-1.0, 1.0, vi == 1u || vi == 2u || vi == 4u);
-    let y = select(-1.0, 1.0, vi == 2u || vi == 3u || vi == 4u);
-    var out: VertexOut;
-    out.clip_pos = vec4<f32>(x, y, 0.0, 1.0);
-    out.uv       = vec2<f32>(x * 0.5 + 0.5, 0.5 - y * 0.5);
-    return out;
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Apply DICOM window/level mapping.
@@ -106,42 +36,6 @@ fn intersect_aabb(ro: vec3<f32>, inv_rd: vec3<f32>) -> vec2<f32> {
     let t_near = max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z));
     let t_far  = min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z));
     return vec2<f32>(max(t_near, 0.0), t_far);
-}
-
-/// Sample the volume at texture coordinates [0,1]³.
-fn sample_vol(tc: vec3<f32>) -> f32 {
-    return textureSample(vol_tex, vol_samp, tc).r;
-}
-
-/// Look up RGBA from the transfer function LUT at normalised scalar t ∈ [0,1].
-fn lut_sample(t: f32) -> vec4<f32> {
-    return textureSample(lut_tex, lut_samp, t);
-}
-
-/// Compute the volume gradient via central differences (texture space).
-fn gradient(tc: vec3<f32>) -> vec3<f32> {
-    let dims = u.dimensions.xyz;
-    let d = vec3<f32>(1.0) / dims;
-    let gx = sample_vol(tc + vec3<f32>(d.x, 0.0, 0.0))
-           - sample_vol(tc - vec3<f32>(d.x, 0.0, 0.0));
-    let gy = sample_vol(tc + vec3<f32>(0.0, d.y, 0.0))
-           - sample_vol(tc - vec3<f32>(0.0, d.y, 0.0));
-    let gz = sample_vol(tc + vec3<f32>(0.0, 0.0, d.z))
-           - sample_vol(tc - vec3<f32>(0.0, 0.0, d.z));
-    return vec3<f32>(gx, gy, gz) * 0.5;
-}
-
-/// Phong shading at a volume point given a surface normal.
-fn phong_shade(normal: vec3<f32>, pos_world: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
-    let n = normalize(normal);
-    let l = normalize(u.light_position.xyz - pos_world);
-    let v = normalize(u.camera_position.xyz - pos_world);
-    let h = normalize(l + v);
-
-    let diff  = max(dot(n, l), 0.0);
-    let spec  = pow(max(dot(n, h), 0.0), u.specular_power);
-
-    return color * (u.ambient + u.diffuse * diff) + vec3<f32>(u.specular * spec);
 }
 
 /// Test whether a world-space position is outside any active clip plane.
@@ -194,10 +88,11 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     // Intersect unit cube [0,1]³ (volume texture AABB)
     let t_hit = intersect_aabb(ro_vol, inv_rd_vol);
     if t_hit.x > t_hit.y {
-        return vec4<f32>(0.0); // ray missed the volume
+        return u.background;
     }
 
     let step = u.step_size / max(max(u.dimensions.x, u.dimensions.y), u.dimensions.z);
+    let scalar_span = max(abs(u.scalar_range.y - u.scalar_range.x), 1e-6);
 
     // ── Ray march ─────────────────────────────────────────────────────────────
     var accum_color: vec3<f32> = vec3<f32>(0.0);
@@ -225,20 +120,23 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         let raw_scalar = sample_vol(tc);
         let norm_scalar = normalise_scalar(raw_scalar);
         let wl_scalar   = window_level(raw_scalar);
+        let g = gradient(tc);
+        let grad_norm = clamp(length(g) / scalar_span, 0.0, 1.0);
+        let step_advance = mix(step * 2.0, step * 0.5, grad_norm);
 
         switch u.blend_mode {
             case BLEND_COMPOSITE: {
                 let rgba = lut_sample(wl_scalar);
                 let c    = rgba.rgb;
-                let a    = rgba.a;
+                var a    = rgba.a;
                 if a > 0.001 {
+                    let grad_opacity = gradient_lut_sample(grad_norm);
+                    a = 1.0 - pow(max(1.0 - a * grad_opacity, 1e-6), u.opacity_correction);
                     var shaded = c;
                     if u.shading_enabled > 0u {
-                        let g       = gradient(tc);
                         let g_world = normalize((u.volume_to_world * vec4<f32>(g, 0.0)).xyz);
                         shaded      = phong_shade(g_world, pos_world, c);
                     }
-                    // Pre-multiplied front-to-back compositing
                     accum_color += (1.0 - accum_alpha) * a * shaded;
                     accum_alpha += (1.0 - accum_alpha) * a;
                 }
@@ -258,8 +156,10 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
             }
             case BLEND_ADDITIVE: {
                 let rgba = lut_sample(wl_scalar);
-                accum_color += rgba.rgb * rgba.a * step;
-                accum_alpha  = min(accum_alpha + rgba.a * step, 1.0);
+                let corrected_alpha =
+                    1.0 - pow(max(1.0 - rgba.a * gradient_lut_sample(grad_norm), 1e-6), u.opacity_correction);
+                accum_color += rgba.rgb * corrected_alpha * step_advance;
+                accum_alpha  = min(accum_alpha + corrected_alpha * step_advance, 1.0);
             }
             case BLEND_ISOSURFACE: {
                 // iso_value stored in scalar_range.z
@@ -268,7 +168,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
                 if step_i > 0u && sign(norm_scalar - norm_iso) != sign(prev_scalar - norm_iso) {
                     iso_hit     = true;
                     iso_pos_vol = tc;
-                    iso_normal  = normalize(gradient(tc));
+                    iso_normal  = normalize(g);
                     break;
                 }
             }
@@ -276,13 +176,14 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         }
 
         prev_scalar = norm_scalar;
-        t += step;
+        t += step_advance;
     }
 
     // ── Resolve result ────────────────────────────────────────────────────────
     switch u.blend_mode {
         case BLEND_COMPOSITE: {
-            return vec4<f32>(accum_color, accum_alpha);
+            let bg = u.background.rgb * max(1.0 - accum_alpha, 0.0);
+            return vec4<f32>(accum_color + bg, 1.0);
         }
         case BLEND_MAX_INTENSITY, BLEND_MIN_INTENSITY: {
             let c = lut_sample(mip_val).rgb;
@@ -307,10 +208,10 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
                 let shaded    = phong_shade(g_world, pos_world, base_c);
                 return vec4<f32>(shaded, 1.0);
             }
-            return vec4<f32>(0.0);
+            return u.background;
         }
         default: {
-            return vec4<f32>(0.0);
+            return u.background;
         }
     }
 }

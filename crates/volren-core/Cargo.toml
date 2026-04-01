@@ -14,3 +14,8 @@ thiserror = { workspace = true }
 [dev-dependencies]
 proptest = { workspace = true }
 approx = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "core_ops"
+harness = false

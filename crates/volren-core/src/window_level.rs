@@ -86,22 +86,40 @@ pub mod presets {
     use super::WindowLevel;
 
     /// Soft tissue window (C 40, W 400).
-    pub const SOFT_TISSUE: WindowLevel = WindowLevel { center: 40.0, width: 400.0 };
+    pub const SOFT_TISSUE: WindowLevel = WindowLevel {
+        center: 40.0,
+        width: 400.0,
+    };
 
     /// Lung window (C −600, W 1500).
-    pub const LUNG: WindowLevel = WindowLevel { center: -600.0, width: 1500.0 };
+    pub const LUNG: WindowLevel = WindowLevel {
+        center: -600.0,
+        width: 1500.0,
+    };
 
     /// Bone window (C 400, W 1500).
-    pub const BONE: WindowLevel = WindowLevel { center: 400.0, width: 1500.0 };
+    pub const BONE: WindowLevel = WindowLevel {
+        center: 400.0,
+        width: 1500.0,
+    };
 
     /// Brain window (C 40, W 80).
-    pub const BRAIN: WindowLevel = WindowLevel { center: 40.0, width: 80.0 };
+    pub const BRAIN: WindowLevel = WindowLevel {
+        center: 40.0,
+        width: 80.0,
+    };
 
     /// Liver window (C 60, W 160).
-    pub const LIVER: WindowLevel = WindowLevel { center: 60.0, width: 160.0 };
+    pub const LIVER: WindowLevel = WindowLevel {
+        center: 60.0,
+        width: 160.0,
+    };
 
     /// Abdomen window (C 60, W 400).
-    pub const ABDOMEN: WindowLevel = WindowLevel { center: 60.0, width: 400.0 };
+    pub const ABDOMEN: WindowLevel = WindowLevel {
+        center: 60.0,
+        width: 400.0,
+    };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -152,10 +170,13 @@ mod tests {
 
     #[test]
     fn presets_are_valid() {
-        // Just check no panic and sensible ranges
-        assert!(presets::SOFT_TISSUE.width > 0.0);
-        assert!(presets::LUNG.width > 0.0);
-        assert!(presets::BONE.width > 0.0);
+        // Check sensible ranges — use let bindings to avoid const-assertion lint.
+        let st = presets::SOFT_TISSUE.width;
+        let lu = presets::LUNG.width;
+        let bo = presets::BONE.width;
+        assert!(st > 0.0);
+        assert!(lu > 0.0);
+        assert!(bo > 0.0);
     }
 
     #[test]

@@ -165,11 +165,19 @@ mod tests {
     }
 
     fn ctx() -> InteractionContext {
-        InteractionContext { viewport_width: 800.0, viewport_height: 600.0, volume_bounds: None }
+        InteractionContext {
+            viewport_width: 800.0,
+            viewport_height: 600.0,
+            volume_bounds: None,
+        }
     }
 
     fn mouse(pos: (f64, f64), kind: MouseEventKind) -> MouseEvent {
-        MouseEvent { position: pos, kind, modifiers: Modifiers::default() }
+        MouseEvent {
+            position: pos,
+            kind,
+            modifiers: Modifiers::default(),
+        }
     }
 
     #[test]
@@ -183,11 +191,7 @@ mod tests {
             &ctx(),
             &mut cam,
         );
-        let r = style.on_mouse_event(
-            &mouse((50.0, 0.0), MouseEventKind::Move),
-            &ctx(),
-            &mut cam,
-        );
+        let r = style.on_mouse_event(&mouse((50.0, 0.0), MouseEventKind::Move), &ctx(), &mut cam);
 
         assert!(r.window_level_changed);
         assert!(style.window_level().width > w0, "width should increase");
@@ -204,11 +208,7 @@ mod tests {
             &ctx(),
             &mut cam,
         );
-        style.on_mouse_event(
-            &mouse((0.0, 30.0), MouseEventKind::Move),
-            &ctx(),
-            &mut cam,
-        );
+        style.on_mouse_event(&mouse((0.0, 30.0), MouseEventKind::Move), &ctx(), &mut cam);
 
         assert_ne!(style.window_level().center, c0, "center should change");
     }

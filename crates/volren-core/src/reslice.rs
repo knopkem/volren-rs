@@ -38,25 +38,49 @@ impl SlicePlane {
         let r = right.normalize_or(DVec3::X);
         // Orthogonalise up against right
         let u = (up - r * up.dot(r)).normalize_or(DVec3::Y);
-        Self { origin, right: r, up: u, width, height }
+        Self {
+            origin,
+            right: r,
+            up: u,
+            width,
+            height,
+        }
     }
 
     /// The standard axial (XY) plane at `z = z_coord` with the given extent.
     #[must_use]
     pub fn axial(z_coord: f64, extent: f64) -> Self {
-        Self::new(DVec3::new(0.0, 0.0, z_coord), DVec3::X, DVec3::Y, extent, extent)
+        Self::new(
+            DVec3::new(0.0, 0.0, z_coord),
+            DVec3::X,
+            DVec3::Y,
+            extent,
+            extent,
+        )
     }
 
     /// The standard coronal (XZ) plane at `y = y_coord` with the given extent.
     #[must_use]
     pub fn coronal(y_coord: f64, extent: f64) -> Self {
-        Self::new(DVec3::new(0.0, y_coord, 0.0), DVec3::X, DVec3::Z, extent, extent)
+        Self::new(
+            DVec3::new(0.0, y_coord, 0.0),
+            DVec3::X,
+            DVec3::Z,
+            extent,
+            extent,
+        )
     }
 
     /// The standard sagittal (YZ) plane at `x = x_coord` with the given extent.
     #[must_use]
     pub fn sagittal(x_coord: f64, extent: f64) -> Self {
-        Self::new(DVec3::new(x_coord, 0.0, 0.0), DVec3::Y, DVec3::Z, extent, extent)
+        Self::new(
+            DVec3::new(x_coord, 0.0, 0.0),
+            DVec3::Y,
+            DVec3::Z,
+            extent,
+            extent,
+        )
     }
 
     /// The outward plane normal (`right × up`).
@@ -101,14 +125,28 @@ impl SlicePlane {
     /// Translate the plane along its normal by `delta` world units.
     #[must_use]
     pub fn offset_along_normal(&self, delta: f64) -> Self {
-        Self { origin: self.origin + self.normal() * delta, ..*self }
+        Self {
+            origin: self.origin + self.normal() * delta,
+            ..*self
+        }
+    }
+
+    /// Translate the plane in place along its normal by `distance` world units.
+    pub fn translate_along_normal(&mut self, distance: f64) {
+        self.origin += self.normal() * distance;
     }
 
     /// Rotate the plane around an axis through `self.origin`.
     #[must_use]
     pub fn rotated(&self, axis: DVec3, angle_rad: f64) -> Self {
         let rot = glam::DQuat::from_axis_angle(axis.normalize_or(DVec3::Z), angle_rad);
-        Self::new(self.origin, rot * self.right, rot * self.up, self.width, self.height)
+        Self::new(
+            self.origin,
+            rot * self.right,
+            rot * self.up,
+            self.width,
+            self.height,
+        )
     }
 }
 
@@ -143,7 +181,11 @@ pub struct ThickSlabParams {
 
 impl Default for ThickSlabParams {
     fn default() -> Self {
-        Self { half_thickness: 1.0, mode: ThickSlabMode::Mip, num_samples: 10 }
+        Self {
+            half_thickness: 1.0,
+            mode: ThickSlabMode::Mip,
+            num_samples: 10,
+        }
     }
 }
 
@@ -199,7 +241,13 @@ mod tests {
 
     #[test]
     fn new_orthogonalises_up() {
-        let p = SlicePlane::new(DVec3::ZERO, DVec3::X, DVec3::new(0.5, 0.866, 0.0), 10.0, 10.0);
+        let p = SlicePlane::new(
+            DVec3::ZERO,
+            DVec3::X,
+            DVec3::new(0.5, 0.866, 0.0),
+            10.0,
+            10.0,
+        );
         let dot = p.right.dot(p.up);
         assert_abs_diff_eq!(dot, 0.0, epsilon = 1e-10);
     }

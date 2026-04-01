@@ -4,8 +4,8 @@ use glam::{DVec2, DVec3, DVec4, UVec2};
 
 use crate::camera::Camera;
 use crate::math::Aabb;
-use crate::volume::{DynVolume, VolumeInfo};
 use crate::render_params::VolumeRenderParams;
+use crate::volume::{DynVolume, VolumeInfo};
 
 /// A ray in world space.
 #[derive(Debug, Clone, Copy)]
@@ -173,7 +173,10 @@ mod tests {
         let ray = Ray::new(DVec3::new(0.5, 0.5, 0.5), DVec3::X);
         let aabb = Aabb::new(DVec3::ZERO, DVec3::ONE);
         let (t_enter, t_exit) = ray.intersect_aabb(&aabb).expect("should hit");
-        assert!(t_enter < 0.0, "origin is inside, t_enter should be negative");
+        assert!(
+            t_enter < 0.0,
+            "origin is inside, t_enter should be negative"
+        );
         assert!(t_exit > 0.0);
     }
 
@@ -187,11 +190,7 @@ mod tests {
 
     #[test]
     fn unproject_center_looks_forward() {
-        let cam = Camera::new(
-            DVec3::new(0.0, 0.0, 5.0),
-            DVec3::ZERO,
-            DVec3::Y,
-        );
+        let cam = Camera::new(DVec3::new(0.0, 0.0, 5.0), DVec3::ZERO, DVec3::Y);
         let viewport = UVec2::new(800, 600);
         let ray = unproject_ray(DVec2::new(400.0, 300.0), &cam, viewport);
         // Ray should point roughly towards -Z (toward focal point)

@@ -32,7 +32,10 @@ impl ColorTransferFunction {
     /// Create an empty function. Points must be added via [`Self::add_point`].
     #[must_use]
     pub fn new(color_space: ColorSpace) -> Self {
-        Self { points: Vec::new(), color_space }
+        Self {
+            points: Vec::new(),
+            color_space,
+        }
     }
 
     /// Create a greyscale ramp: black at `scalar_min`, white at `scalar_max`.
@@ -48,7 +51,10 @@ impl ColorTransferFunction {
     ///
     /// If a point at the same scalar already exists it is replaced.
     pub fn add_point(&mut self, scalar: f64, rgb: [f64; 3]) {
-        match self.points.binary_search_by(|(s, _)| s.partial_cmp(&scalar).unwrap()) {
+        match self
+            .points
+            .binary_search_by(|(s, _)| s.partial_cmp(&scalar).unwrap())
+        {
             Ok(pos) => self.points[pos] = (scalar, rgb),
             Err(pos) => self.points.insert(pos, (scalar, rgb)),
         }
@@ -56,8 +62,10 @@ impl ColorTransferFunction {
 
     /// Remove a control point closest to `scalar` (within `epsilon`).
     pub fn remove_point(&mut self, scalar: f64, epsilon: f64) {
-        if let Some(pos) =
-            self.points.iter().position(|(s, _)| (s - scalar).abs() < epsilon)
+        if let Some(pos) = self
+            .points
+            .iter()
+            .position(|(s, _)| (s - scalar).abs() < epsilon)
         {
             self.points.remove(pos);
         }

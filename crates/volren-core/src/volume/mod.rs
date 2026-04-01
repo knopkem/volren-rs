@@ -133,11 +133,14 @@ pub trait VolumeInfo {
             DVec3::new(0.0, dims.y - 1.0, dims.z - 1.0),
             dims - DVec3::ONE,
         ];
-        let world_corners: Vec<DVec3> =
-            corners.iter().map(|&c| self.index_to_world(c)).collect();
+        let world_corners: Vec<DVec3> = corners.iter().map(|&c| self.index_to_world(c)).collect();
 
-        let min = world_corners.iter().fold(DVec3::splat(f64::INFINITY), |a, &b| a.min(b));
-        let max = world_corners.iter().fold(DVec3::splat(f64::NEG_INFINITY), |a, &b| a.max(b));
+        let min = world_corners
+            .iter()
+            .fold(DVec3::splat(f64::INFINITY), |a, &b| a.min(b));
+        let max = world_corners
+            .iter()
+            .fold(DVec3::splat(f64::NEG_INFINITY), |a, &b| a.max(b));
         Aabb::new(min, max)
     }
 }
@@ -351,6 +354,12 @@ impl<T: Scalar> Volume<T> {
         bytemuck::cast_slice(&self.data)
     }
 
+    /// Borrow the typed scalar buffer.
+    #[must_use]
+    pub fn data(&self) -> &[T] {
+        &self.data
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     fn validate(dimensions: UVec3, spacing: DVec3, components: u32) -> Result<(), VolumeError> {
@@ -402,7 +411,9 @@ mod tests {
     use glam::{DMat3, DVec3, UVec3};
 
     fn unit_volume() -> Volume<u8> {
-        let data = (0u8..=3).flat_map(|z| (0u8..=3).flat_map(move |y| (0u8..=3).map(move |x| x + y * 4 + z * 16))).collect();
+        let data = (0u8..=3)
+            .flat_map(|z| (0u8..=3).flat_map(move |y| (0u8..=3).map(move |x| x + y * 4 + z * 16)))
+            .collect();
         Volume::from_data(
             data,
             UVec3::new(4, 4, 4),
@@ -548,7 +559,10 @@ mod tests {
             DVec3::ZERO,
             DMat3::IDENTITY,
         );
-        assert!(matches!(err, Err(VolumeError::InconsistentSlice { index: 1, .. })));
+        assert!(matches!(
+            err,
+            Err(VolumeError::InconsistentSlice { index: 1, .. })
+        ));
     }
 
     #[test]

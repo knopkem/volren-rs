@@ -11,10 +11,11 @@ use glam::DVec4;
 ///
 /// # VTK Equivalent
 /// `vtkGPUVolumeRayCastMapper::SetBlendMode`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[non_exhaustive]
 pub enum BlendMode {
     /// Front-to-back alpha compositing (default for anatomical rendering).
+    #[default]
     Composite,
     /// Maximum intensity projection — displays the brightest voxel along each ray.
     MaximumIntensity,
@@ -29,12 +30,6 @@ pub enum BlendMode {
         /// The scalar value defining the isosurface.
         iso_value: f64,
     },
-}
-
-impl Default for BlendMode {
-    fn default() -> Self {
-        Self::Composite
-    }
 }
 
 // ── Interpolation ─────────────────────────────────────────────────────────────
@@ -69,7 +64,12 @@ pub struct ShadingParams {
 
 impl Default for ShadingParams {
     fn default() -> Self {
-        Self { ambient: 0.1, diffuse: 0.7, specular: 0.2, specular_power: 10.0 }
+        Self {
+            ambient: 0.1,
+            diffuse: 0.7,
+            specular: 0.2,
+            specular_power: 10.0,
+        }
     }
 }
 
@@ -95,7 +95,9 @@ impl ClipPlane {
     pub fn from_point_and_normal(point: glam::DVec3, normal: glam::DVec3) -> Self {
         let n = normal.normalize();
         let d = -n.dot(point);
-        Self { equation: DVec4::new(n.x, n.y, n.z, d) }
+        Self {
+            equation: DVec4::new(n.x, n.y, n.z, d),
+        }
     }
 
     /// Signed distance of `pos` from the plane (positive = kept side).

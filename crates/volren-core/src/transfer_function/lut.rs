@@ -58,7 +58,12 @@ impl TransferFunctionLut {
             rgba.push(a as f32);
         }
 
-        Self { rgba, lut_size, scalar_min, scalar_max }
+        Self {
+            rgba,
+            lut_size,
+            scalar_min,
+            scalar_max,
+        }
     }
 
     /// Raw RGBA `f32` slice, suitable for GPU texture upload.

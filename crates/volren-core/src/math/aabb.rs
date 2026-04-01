@@ -28,7 +28,10 @@ impl Aabb {
     /// Create from a center point and half-extents.
     #[must_use]
     pub fn from_center_half_extents(center: DVec3, half: DVec3) -> Self {
-        Self { min: center - half, max: center + half }
+        Self {
+            min: center - half,
+            max: center + half,
+        }
     }
 
     /// The geometric center of this AABB.
@@ -58,7 +61,10 @@ impl Aabb {
     /// Expand the AABB to include `point`.
     #[must_use]
     pub fn expanded_to_include(&self, point: DVec3) -> Self {
-        Self { min: self.min.min(point), max: self.max.max(point) }
+        Self {
+            min: self.min.min(point),
+            max: self.max.max(point),
+        }
     }
 
     /// Intersect a ray (origin + t*direction) against this AABB using the slab method.

@@ -6,8 +6,7 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 #![warn(clippy::all)]
-#![warn(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::pedantic)]
 
 pub mod camera;
 pub mod interaction;
@@ -22,7 +21,7 @@ pub mod window_level;
 // Top-level re-exports for ergonomic use.
 pub use camera::{Camera, Projection};
 pub use interaction::{
-    InteractionContext, InteractionResult, InteractionStyle, Key, KeyEvent, Modifiers,
+    InteractionContext, InteractionResult, InteractionStyle, Key, KeyEvent, Modifiers, MouseButton,
     MouseEvent, MouseEventKind,
 };
 pub use math::aabb::Aabb;
@@ -30,7 +29,8 @@ pub use picking::{PickResult, Ray};
 pub use render_params::{BlendMode, ClipPlane, Interpolation, ShadingParams, VolumeRenderParams};
 pub use reslice::{SlicePlane, ThickSlabMode, ThickSlabParams};
 pub use transfer_function::{
-    ColorSpace, ColorTransferFunction, OpacityTransferFunction, TransferFunctionLut,
+    ColorSpace, ColorTransferFunction, OpacityTransferFunction, TransferFunction2D,
+    TransferFunction2DRegion, TransferFunctionLut,
 };
 pub use volume::{DynVolume, Scalar, Volume, VolumeError, VolumeInfo};
 pub use window_level::WindowLevel;

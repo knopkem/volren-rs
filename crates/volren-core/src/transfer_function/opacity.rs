@@ -33,7 +33,10 @@ impl OpacityTransferFunction {
     /// `opacity` is clamped to `[0, 1]`.
     pub fn add_point(&mut self, scalar: f64, opacity: f64) {
         let opacity = opacity.clamp(0.0, 1.0);
-        match self.points.binary_search_by(|(s, _)| s.partial_cmp(&scalar).unwrap()) {
+        match self
+            .points
+            .binary_search_by(|(s, _)| s.partial_cmp(&scalar).unwrap())
+        {
             Ok(pos) => self.points[pos] = (scalar, opacity),
             Err(pos) => self.points.insert(pos, (scalar, opacity)),
         }
@@ -41,7 +44,11 @@ impl OpacityTransferFunction {
 
     /// Remove a control point within `epsilon` of `scalar`.
     pub fn remove_point(&mut self, scalar: f64, epsilon: f64) {
-        if let Some(pos) = self.points.iter().position(|(s, _)| (s - scalar).abs() < epsilon) {
+        if let Some(pos) = self
+            .points
+            .iter()
+            .position(|(s, _)| (s - scalar).abs() < epsilon)
+        {
             self.points.remove(pos);
         }
     }
@@ -58,7 +65,10 @@ impl OpacityTransferFunction {
         if scalar >= self.points.last().unwrap().0 {
             return self.points.last().unwrap().1;
         }
-        let pos = self.points.partition_point(|(s, _)| *s <= scalar).saturating_sub(1);
+        let pos = self
+            .points
+            .partition_point(|(s, _)| *s <= scalar)
+            .saturating_sub(1);
         let (s0, a0) = self.points[pos];
         let (s1, a1) = self.points[pos + 1];
         let t = (scalar - s0) / (s1 - s0);
@@ -106,7 +116,11 @@ mod tests {
 
     #[test]
     fn empty_returns_zero() {
-        assert_abs_diff_eq!(OpacityTransferFunction::new().evaluate(0.5), 0.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(
+            OpacityTransferFunction::new().evaluate(0.5),
+            0.0,
+            epsilon = 1e-10
+        );
     }
 
     #[test]

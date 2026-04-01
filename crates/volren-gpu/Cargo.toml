@@ -12,7 +12,12 @@ glam = { workspace = true }
 wgpu = { workspace = true }
 bytemuck = { workspace = true }
 thiserror = { workspace = true }
+half = { workspace = true }
 
 [dev-dependencies]
 pollster = { workspace = true }
 volren-core = { workspace = true }
+
+[features]
+default = []
+snapshot-tests = []

@@ -154,11 +154,19 @@ mod tests {
     }
 
     fn ctx() -> InteractionContext {
-        InteractionContext { viewport_width: 800.0, viewport_height: 600.0, volume_bounds: None }
+        InteractionContext {
+            viewport_width: 800.0,
+            viewport_height: 600.0,
+            volume_bounds: None,
+        }
     }
 
     fn mouse(pos: (f64, f64), kind: MouseEventKind) -> MouseEvent {
-        MouseEvent { position: pos, kind, modifiers: Modifiers::default() }
+        MouseEvent {
+            position: pos,
+            kind,
+            modifiers: Modifiers::default(),
+        }
     }
 
     #[test]
@@ -174,11 +182,7 @@ mod tests {
         );
         assert!(!r1.camera_changed);
 
-        let r2 = style.on_mouse_event(
-            &mouse((50.0, 0.0), MouseEventKind::Move),
-            &ctx(),
-            &mut cam,
-        );
+        let r2 = style.on_mouse_event(&mouse((50.0, 0.0), MouseEventKind::Move), &ctx(), &mut cam);
         assert!(r2.camera_changed);
         // Distance preserved after orbit
         assert_abs_diff_eq!(cam.distance(), d0, epsilon = 1e-6);

@@ -40,11 +40,17 @@ macro_rules! impl_scalar_int {
         impl Scalar for $T {
             const TYPE_NAME: &'static str = $name;
             #[inline]
-            fn min_value() -> Self { <$T>::MIN }
+            fn min_value() -> Self {
+                <$T>::MIN
+            }
             #[inline]
-            fn max_value() -> Self { <$T>::MAX }
+            fn max_value() -> Self {
+                <$T>::MAX
+            }
             #[inline]
-            fn to_f64(self) -> f64 { self as f64 }
+            fn to_f64(self) -> f64 {
+                self as f64
+            }
             #[inline]
             fn from_f64_clamped(v: f64) -> Self {
                 v.clamp(<$T>::MIN as f64, <$T>::MAX as f64).round() as $T
@@ -58,13 +64,21 @@ macro_rules! impl_scalar_float {
         impl Scalar for $T {
             const TYPE_NAME: &'static str = $name;
             #[inline]
-            fn min_value() -> Self { <$T>::MIN }
+            fn min_value() -> Self {
+                <$T>::MIN
+            }
             #[inline]
-            fn max_value() -> Self { <$T>::MAX }
+            fn max_value() -> Self {
+                <$T>::MAX
+            }
             #[inline]
-            fn to_f64(self) -> f64 { self as f64 }
+            fn to_f64(self) -> f64 {
+                self as f64
+            }
             #[inline]
-            fn from_f64_clamped(v: f64) -> Self { v as $T }
+            fn from_f64_clamped(v: f64) -> Self {
+                v as $T
+            }
         }
     };
 }

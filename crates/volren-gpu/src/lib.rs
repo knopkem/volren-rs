@@ -12,6 +12,4 @@ pub mod renderer;
 pub(crate) mod texture;
 pub(crate) mod uniforms;
 
-pub use renderer::{
-    CrosshairParams, OrientationLabels, RenderError, Viewport, VolumeRenderer,
-};
+pub use renderer::{CrosshairParams, OrientationLabels, RenderError, Viewport, VolumeRenderer};
