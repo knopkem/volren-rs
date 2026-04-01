@@ -61,11 +61,10 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     var valid = 0u;
 
     for (var i = 0u; i < num_samples; i++) {
-        let offset = if num_samples == 1u {
-            0.0
-        } else {
-            mix(-half_thickness, half_thickness, f32(i) / f32(num_samples - 1u))
-        };
+        var offset = 0.0;
+        if num_samples != 1u {
+            offset = mix(-half_thickness, half_thickness, f32(i) / f32(num_samples - 1u));
+        }
         let sample = sample_world(base_world + offset * u.slice_normal.xyz);
         if sample.y > 0.5 {
             if valid == 0u {
@@ -84,11 +83,18 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
-    let value = switch u.slab_params.x {
-        case THICK_MIP: { best }
-        case THICK_MINIP: { min_value }
-        default: { sum / f32(valid) }
-    };
+    var value = sum / f32(valid);
+    switch u.slab_params.x {
+        case THICK_MIP: {
+            value = best;
+        }
+        case THICK_MINIP: {
+            value = min_value;
+        }
+        default: {
+            value = sum / f32(valid);
+        }
+    }
 
     let grey = apply_window_level(value);
     return vec4<f32>(grey, grey, grey, 1.0);

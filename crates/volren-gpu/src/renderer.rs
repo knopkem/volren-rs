@@ -456,7 +456,9 @@ impl VolumeRenderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: self.output_format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         })
     }
@@ -1068,10 +1070,10 @@ impl VolumeRenderer {
                 uniform_bgl_entry(0),
                 texture_bgl_entry(1, wgpu::TextureViewDimension::D3),
                 sampler_bgl_entry(2),
-                texture_bgl_entry(3, wgpu::TextureViewDimension::D1),
-                sampler_bgl_entry(4),
-                texture_bgl_entry(5, wgpu::TextureViewDimension::D1),
-                sampler_bgl_entry(6),
+                texture_bgl_entry_nonfilterable(3, wgpu::TextureViewDimension::D1),
+                sampler_bgl_entry_nonfiltering(4),
+                texture_bgl_entry_nonfilterable(5, wgpu::TextureViewDimension::D1),
+                sampler_bgl_entry_nonfiltering(6),
             ],
         })
     }
@@ -1169,8 +1171,8 @@ impl VolumeRenderer {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("volren_lut_sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
         (texture, view, sampler)
@@ -1274,6 +1276,22 @@ fn texture_bgl_entry(
     }
 }
 
+fn texture_bgl_entry_nonfilterable(
+    binding: u32,
+    view_dimension: wgpu::TextureViewDimension,
+) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+            view_dimension,
+            multisampled: false,
+        },
+        count: None,
+    }
+}
+
 fn texture_bgl_entry_2d(binding: u32) -> wgpu::BindGroupLayoutEntry {
     texture_bgl_entry(binding, wgpu::TextureViewDimension::D2)
 }
@@ -1283,6 +1301,15 @@ fn sampler_bgl_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
         binding,
         visibility: wgpu::ShaderStages::FRAGMENT,
         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+        count: None,
+    }
+}
+
+fn sampler_bgl_entry_nonfiltering(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
         count: None,
     }
 }
