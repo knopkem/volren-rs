@@ -5,6 +5,13 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/volren-gpu"
+readme = "../../README.md"
+keywords = ["volume-rendering", "wgpu", "gpu", "raycasting", "medical-imaging"]
+categories = ["graphics", "rendering", "science"]
 
 [dependencies]
 volren-core = { workspace = true }

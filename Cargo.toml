@@ -10,7 +10,9 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
 license = "MIT OR Apache-2.0"
-authors = []
+authors = ["Michael Knopke"]
+repository = "https://github.com/knopkem/volren-rs"
+homepage = "https://github.com/knopkem/volren-rs"
 
 [workspace.dependencies]
 # Internal

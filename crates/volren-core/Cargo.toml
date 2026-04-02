@@ -5,6 +5,13 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/volren-core"
+readme = "../../README.md"
+keywords = ["volume-rendering", "medical-imaging", "camera", "transfer-function", "raycasting"]
+categories = ["graphics", "algorithms", "science"]
 
 [dependencies]
 glam = { workspace = true }
