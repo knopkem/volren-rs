@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
 use glam::{DMat3, DMat4, DVec2, DVec3, DVec4};
+use half::f16;
 use volren_core::{
     camera::Camera,
     render_params::{BlendMode, ClipPlane, VolumeRenderParams},
@@ -394,12 +395,13 @@ impl VolumeRenderer {
     /// Upload a baked transfer-function LUT to the GPU.
     pub fn set_transfer_function(&mut self, lut: &TransferFunctionLut) {
         let (texture, view, sampler) = Self::create_lut_texture(&self.device, lut.lut_size());
+        let f16_bytes = f32_slice_to_f16_bytes(lut.as_rgba_f32());
         self.queue.write_texture(
             texture.as_image_copy(),
-            lut.as_bytes(),
+            &f16_bytes,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(lut.lut_size() * 4 * 4),
+                bytes_per_row: Some(lut.lut_size() * 4 * 2),
                 rows_per_image: None,
             },
             wgpu::Extent3d {
@@ -572,14 +574,12 @@ impl VolumeRenderer {
         let lod_height = (viewport.height / factor).max(1);
         let texture = self.create_render_target(lod_width, lod_height);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let mut lod_params = params.clone();
-        lod_params.step_size_factor *= factor as f32;
 
         self.render_volume(
             encoder,
             &view,
             camera,
-            &lod_params,
+            params,
             Viewport::full(lod_width, lod_height),
         )?;
         self.blit_texture_view(encoder, target, viewport, &view);
@@ -893,14 +893,16 @@ impl VolumeRenderer {
 
     fn upload_gradient_lut(&mut self, tf: &OpacityTransferFunction) {
         let resolution = 1024u32;
-        let bytes = bake_opacity_lut_bytes(tf, resolution);
+        let f32_bytes = bake_opacity_lut_bytes(tf, resolution);
+        let f32_slice: &[f32] = bytemuck::cast_slice(&f32_bytes);
+        let f16_bytes = f32_slice_to_f16_bytes(f32_slice);
         let (texture, view, sampler) = Self::create_lut_texture(&self.device, resolution);
         self.queue.write_texture(
             texture.as_image_copy(),
-            &bytes,
+            &f16_bytes,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(resolution * 4 * 4),
+                bytes_per_row: Some(resolution * 4 * 2),
                 rows_per_image: None,
             },
             wgpu::Extent3d {
@@ -1072,10 +1074,10 @@ impl VolumeRenderer {
                 uniform_bgl_entry(0),
                 texture_bgl_entry(1, wgpu::TextureViewDimension::D3),
                 sampler_bgl_entry(2),
-                texture_bgl_entry_nonfilterable(3, wgpu::TextureViewDimension::D1),
-                sampler_bgl_entry_nonfiltering(4),
-                texture_bgl_entry_nonfilterable(5, wgpu::TextureViewDimension::D1),
-                sampler_bgl_entry_nonfiltering(6),
+                texture_bgl_entry(3, wgpu::TextureViewDimension::D1),
+                sampler_bgl_entry(4),
+                texture_bgl_entry(5, wgpu::TextureViewDimension::D1),
+                sampler_bgl_entry(6),
             ],
         })
     }
@@ -1162,7 +1164,7 @@ impl VolumeRenderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D1,
-            format: wgpu::TextureFormat::Rgba32Float,
+            format: wgpu::TextureFormat::Rgba16Float,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
@@ -1173,8 +1175,8 @@ impl VolumeRenderer {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("volren_lut_sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
         (texture, view, sampler)
@@ -1208,6 +1210,15 @@ fn bake_opacity_lut_bytes(tf: &OpacityTransferFunction, resolution: u32) -> Vec<
         rgba.extend_from_slice(&[opacity, opacity, opacity, 1.0]);
     }
     bytemuck::cast_slice(&rgba).to_vec()
+}
+
+/// Convert an f32 slice to packed f16 (little-endian) bytes for `Rgba16Float` upload.
+fn f32_slice_to_f16_bytes(data: &[f32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(data.len() * 2);
+    for &val in data {
+        bytes.extend_from_slice(&f16::from_f32(val).to_le_bytes());
+    }
+    bytes
 }
 
 fn combined_clip_planes(params: &VolumeRenderParams) -> ([[f32; 4]; 6], u32) {
@@ -1278,22 +1289,6 @@ fn texture_bgl_entry(
     }
 }
 
-fn texture_bgl_entry_nonfilterable(
-    binding: u32,
-    view_dimension: wgpu::TextureViewDimension,
-) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-            view_dimension,
-            multisampled: false,
-        },
-        count: None,
-    }
-}
-
 fn texture_bgl_entry_2d(binding: u32) -> wgpu::BindGroupLayoutEntry {
     texture_bgl_entry(binding, wgpu::TextureViewDimension::D2)
 }
@@ -1303,15 +1298,6 @@ fn sampler_bgl_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
         binding,
         visibility: wgpu::ShaderStages::FRAGMENT,
         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-        count: None,
-    }
-}
-
-fn sampler_bgl_entry_nonfiltering(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
         count: None,
     }
 }

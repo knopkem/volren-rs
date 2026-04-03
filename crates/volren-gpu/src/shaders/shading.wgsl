@@ -4,8 +4,9 @@ fn phong_shade(normal: vec3<f32>, pos_world: vec3<f32>, color: vec3<f32>) -> vec
     let v = normalize(u.camera_position.xyz - pos_world);
     let h = normalize(l + v);
 
-    let diff = max(dot(n, l), 0.0);
-    let spec = pow(max(dot(n, h), 0.0), u.specular_power);
+    // Two-sided shading: illuminate surfaces regardless of normal orientation.
+    let diff = abs(dot(n, l));
+    let spec = pow(max(abs(dot(n, h)), 0.0), u.specular_power);
 
     return color * (u.ambient + u.diffuse * diff) + vec3<f32>(u.specular * spec);
 }

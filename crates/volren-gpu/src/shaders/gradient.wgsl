@@ -19,5 +19,7 @@ fn gradient(tc: vec3<f32>) -> vec3<f32> {
         - sample_vol(tc - vec3<f32>(0.0, d.y, 0.0));
     let gz = sample_vol(tc + vec3<f32>(0.0, 0.0, d.z))
         - sample_vol(tc - vec3<f32>(0.0, 0.0, d.z));
-    return vec3<f32>(gx, gy, gz) * 0.5;
+    // Central differences: divide by 2h = 2/dims to obtain the true
+    // texture-space gradient ∂f/∂tc (not scaled by 1/dims).
+    return vec3<f32>(gx, gy, gz) * dims * 0.5;
 }

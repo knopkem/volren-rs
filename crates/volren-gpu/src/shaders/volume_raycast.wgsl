@@ -15,6 +15,13 @@
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/// Screen-space hash for per-pixel jitter (eliminates banding artifacts).
+fn hash_screen(p: vec2<f32>) -> f32 {
+    var p3 = fract(vec3<f32>(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
 /// Apply DICOM window/level mapping.
 fn window_level(v: f32) -> f32 {
     let t = (v - u.window_center + 0.5) / u.window_width + 0.5;
@@ -100,7 +107,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     var iso_normal:  vec3<f32> = vec3<f32>(0.0);
     var prev_scalar: f32       = 0.0;
 
-    var t = t_hit.x + step * 0.5; // jitter to reduce banding
+    var t = t_hit.x + step * hash_screen(vec2<f32>(ndc_x * 512.0 + 0.5, ndc_y * 512.0 + 0.5)); // per-pixel jitter
 
     for (var step_i = 0u; step_i < MAX_STEPS && t < t_hit.y; step_i++) {
         let tc       = ro_vol + rd_vol * t;
@@ -116,8 +123,14 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         let norm_scalar = normalise_scalar(raw_scalar);
         let wl_scalar   = window_level(raw_scalar);
         let g = gradient(tc);
-        let grad_norm = clamp(length(g) / scalar_span, 0.0, 1.0);
+        // Transform gradient (co-vector) from texture to world space using the
+        // inverse-transpose of volume_to_world, i.e. transpose(world_to_volume).
+        // This correctly handles anisotropic voxel spacing.
+        let g_world_raw = (transpose(u.world_to_volume) * vec4<f32>(g, 0.0)).xyz;
+        let grad_norm = clamp(length(g_world_raw) / scalar_span, 0.0, 1.0);
         let step_advance = mix(step * 2.0, step * 0.5, grad_norm);
+        // Opacity correction must scale with the actual step used (Beer-Lambert).
+        let step_correction = u.opacity_correction * (step_advance / step);
 
         switch u.blend_mode {
             case BLEND_COMPOSITE: {
@@ -126,10 +139,10 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
                 var a    = rgba.a;
                 if a > 0.001 {
                     let grad_opacity = gradient_lut_sample(grad_norm);
-                    a = 1.0 - pow(max(1.0 - a * grad_opacity, 1e-6), u.opacity_correction);
+                    a = 1.0 - pow(max(1.0 - a * grad_opacity, 1e-6), step_correction);
                     var shaded = c;
                     if u.shading_enabled > 0u {
-                        let g_world = normalize((u.volume_to_world * vec4<f32>(g, 0.0)).xyz);
+                        let g_world = normalize(g_world_raw);
                         shaded      = phong_shade(g_world, pos_world, c);
                     }
                     accum_color += (1.0 - accum_alpha) * a * shaded;
@@ -152,7 +165,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
             case BLEND_ADDITIVE: {
                 let rgba = lut_sample(wl_scalar);
                 let corrected_alpha =
-                    1.0 - pow(max(1.0 - rgba.a * gradient_lut_sample(grad_norm), 1e-6), u.opacity_correction);
+                    1.0 - pow(max(1.0 - rgba.a * gradient_lut_sample(grad_norm), 1e-6), step_correction);
                 accum_color += rgba.rgb * corrected_alpha * step_advance;
                 accum_alpha  = min(accum_alpha + corrected_alpha * step_advance, 1.0);
             }
@@ -198,7 +211,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         case BLEND_ISOSURFACE: {
             if iso_hit {
                 let pos_world = (u.volume_to_world * vec4<f32>(iso_pos_vol, 1.0)).xyz;
-                let g_world   = normalize((u.volume_to_world * vec4<f32>(iso_normal, 0.0)).xyz);
+                let g_world   = normalize((transpose(u.world_to_volume) * vec4<f32>(iso_normal, 0.0)).xyz);
                 let base_c    = vec3<f32>(0.85, 0.85, 0.85);
                 let shaded    = phong_shade(g_world, pos_world, base_c);
                 return vec4<f32>(shaded, 1.0);
