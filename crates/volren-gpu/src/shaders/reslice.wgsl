@@ -43,7 +43,7 @@ fn sample_world(world_pos: vec3<f32>) -> vec2<f32> {
     if any(tc < vec3<f32>(0.0)) || any(tc > vec3<f32>(1.0)) {
         return vec2<f32>(0.0, 0.0);
     }
-    return vec2<f32>(textureSample(vol_tex, vol_samp, tc).r, 1.0);
+    return vec2<f32>(textureSampleLevel(vol_tex, vol_samp, tc, 0.0).r, 1.0);
 }
 
 @fragment

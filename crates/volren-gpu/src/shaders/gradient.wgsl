@@ -1,13 +1,13 @@
 fn sample_vol(tc: vec3<f32>) -> f32 {
-    return textureSample(vol_tex, vol_samp, tc).r;
+    return textureSampleLevel(vol_tex, vol_samp, tc, 0.0).r;
 }
 
 fn lut_sample(t: f32) -> vec4<f32> {
-    return textureSample(lut_tex, lut_samp, t);
+    return textureSampleLevel(lut_tex, lut_samp, t, 0.0);
 }
 
 fn gradient_lut_sample(t: f32) -> f32 {
-    return textureSample(grad_lut_tex, grad_lut_samp, clamp(t, 0.0, 1.0)).r;
+    return textureSampleLevel(grad_lut_tex, grad_lut_samp, clamp(t, 0.0, 1.0), 0.0).r;
 }
 
 fn gradient(tc: vec3<f32>) -> vec3<f32> {
