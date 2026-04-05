@@ -37,11 +37,7 @@ pub(crate) struct GpuVolumeTexture {
 
 impl GpuVolumeTexture {
     /// Allocate an empty 3D GPU texture for the given volume dimensions.
-    pub fn allocate_empty(
-        device: &wgpu::Device,
-        dimensions: glam::UVec3,
-        linear: bool,
-    ) -> Self {
+    pub fn allocate_empty(device: &wgpu::Device, dimensions: glam::UVec3, linear: bool) -> Self {
         let format = GpuTextureFormat::R16Float.to_wgpu();
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("volren_volume_3d"),
@@ -73,7 +69,7 @@ impl GpuVolumeTexture {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: filter,
             min_filter: filter,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
 
@@ -99,7 +95,14 @@ impl GpuVolumeTexture {
         let dims = volume.dimensions();
         let texture = Self::allocate_empty(device, dims, linear);
         let voxels = to_f16_bits(volume);
-        write_f16_bits(queue, &texture.texture, texture.dimensions, 0, dims.z, &voxels);
+        write_f16_bits(
+            queue,
+            &texture.texture,
+            texture.dimensions,
+            0,
+            dims.z,
+            &voxels,
+        );
         texture
     }
 
@@ -109,7 +112,14 @@ impl GpuVolumeTexture {
             .iter()
             .map(|&value| f16::from_f32(f32::from(value)).to_bits())
             .collect();
-        write_f16_bits(queue, &self.texture, self.dimensions, z_index, 1, &converted);
+        write_f16_bits(
+            queue,
+            &self.texture,
+            self.dimensions,
+            z_index,
+            1,
+            &converted,
+        );
     }
 }
 

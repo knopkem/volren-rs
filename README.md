@@ -89,7 +89,7 @@ cargo test --workspace
 cargo clippy --workspace
 ```
 
-Requires Rust 1.80+. The GPU crate needs a wgpu-compatible graphics driver for runtime use, but compiles without one.
+Requires Rust 1.87+. The GPU crate needs a wgpu-compatible graphics driver for runtime use, but compiles without one.
 
 ## Integration with medical imaging
 

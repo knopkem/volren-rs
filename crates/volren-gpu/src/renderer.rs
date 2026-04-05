@@ -188,7 +188,11 @@ impl VolumeMetadata {
         Self {
             world_to_volume: world_to_volume.as_mat4().to_cols_array_2d(),
             volume_to_world: volume_to_world.as_mat4().to_cols_array_2d(),
-            dimensions: [dimensions_f64.x as f32, dimensions_f64.y as f32, dimensions_f64.z as f32],
+            dimensions: [
+                dimensions_f64.x as f32,
+                dimensions_f64.y as f32,
+                dimensions_f64.z as f32,
+            ],
             spacing: [spacing.x as f32, spacing.y as f32, spacing.z as f32],
             scalar_range: [scalar_range.0 as f32, scalar_range.1 as f32],
         }
@@ -584,6 +588,7 @@ impl VolumeRenderer {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
                 resolve_target: None,
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
@@ -592,6 +597,7 @@ impl VolumeRenderer {
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
         pass.set_pipeline(&self.volume_pipeline);
         pass.set_bind_group(0, bind_group, &[]);
@@ -698,6 +704,7 @@ impl VolumeRenderer {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
                 resolve_target: None,
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
@@ -706,6 +713,7 @@ impl VolumeRenderer {
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
         pass.set_pipeline(&self.slice_pipeline);
         pass.set_bind_group(0, bind_group, &[]);
@@ -781,6 +789,7 @@ impl VolumeRenderer {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
                 resolve_target: None,
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
@@ -789,6 +798,7 @@ impl VolumeRenderer {
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
         pass.set_pipeline(&self.crosshair_pipeline);
         pass.set_bind_group(0, &self.crosshair_bind_group, &[]);
@@ -1128,6 +1138,7 @@ impl VolumeRenderer {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
                 resolve_target: None,
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
@@ -1136,6 +1147,7 @@ impl VolumeRenderer {
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
         pass.set_pipeline(&self.blit_pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
@@ -1199,8 +1211,8 @@ impl VolumeRenderer {
     ) -> wgpu::RenderPipeline {
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("volren_pipeline_layout"),
-            bind_group_layouts: &[bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(bind_group_layout)],
+            immediate_size: 0,
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -1228,7 +1240,7 @@ impl VolumeRenderer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         })
     }

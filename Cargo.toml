@@ -8,7 +8,7 @@ members = [
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.87"
 license = "MIT OR Apache-2.0"
 authors = ["Michael Knopke"]
 repository = "https://github.com/knopkem/volren-rs"
@@ -29,7 +29,7 @@ half = "2"
 thiserror = "2"
 
 # GPU abstraction
-wgpu = { version = "24", features = ["spirv"] }
+wgpu = { version = "29.0.1", features = ["spirv"] }
 
 # Testing
 proptest = "1"
