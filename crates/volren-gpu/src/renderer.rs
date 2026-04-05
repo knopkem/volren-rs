@@ -72,6 +72,24 @@ pub enum RenderError {
     /// Viewport has zero area.
     #[error("viewport has zero area")]
     ZeroViewport,
+    /// A progressive slice update referenced a texture slice that does not exist.
+    #[error("slice index {z_index} is out of bounds for depth {depth}")]
+    SliceOutOfBounds {
+        /// Slice index requested by the caller.
+        z_index: u32,
+        /// Texture depth currently allocated.
+        depth: u32,
+    },
+    /// A progressive slice update had the wrong number of voxels.
+    #[error("slice {z_index} has {actual} voxels, expected {expected}")]
+    SliceLengthMismatch {
+        /// Slice index requested by the caller.
+        z_index: u32,
+        /// Expected voxel count for one slice.
+        expected: usize,
+        /// Actual voxel count supplied.
+        actual: usize,
+    },
 }
 
 /// Parameters for rendering crosshair overlay lines on a 2D slice viewport.
@@ -139,29 +157,40 @@ struct VolumeMetadata {
 
 impl VolumeMetadata {
     fn from_volume(volume: &DynVolume) -> Self {
-        let dimensions = volume.dimensions().as_dvec3();
-        let spacing = volume.spacing();
-        let direction = mat4_from_direction(volume.direction());
+        let (scalar_min, scalar_max) = volume.scalar_range();
+        Self::from_parts(
+            volume.dimensions(),
+            volume.spacing(),
+            volume.origin(),
+            volume.direction(),
+            (scalar_min, scalar_max),
+        )
+    }
+
+    fn from_parts(
+        dimensions: glam::UVec3,
+        spacing: DVec3,
+        origin: DVec3,
+        direction: DMat3,
+        scalar_range: (f64, f64),
+    ) -> Self {
+        let dimensions_f64 = dimensions.as_dvec3();
+        let direction = mat4_from_direction(direction);
         let scale = DVec3::new(
-            (dimensions.x - 1.0).max(1.0) * spacing.x,
-            (dimensions.y - 1.0).max(1.0) * spacing.y,
-            (dimensions.z - 1.0).max(1.0) * spacing.z,
+            (dimensions_f64.x - 1.0).max(1.0) * spacing.x,
+            (dimensions_f64.y - 1.0).max(1.0) * spacing.y,
+            (dimensions_f64.z - 1.0).max(1.0) * spacing.z,
         );
         let volume_to_world =
-            DMat4::from_translation(volume.origin()) * direction * DMat4::from_scale(scale);
+            DMat4::from_translation(origin) * direction * DMat4::from_scale(scale);
         let world_to_volume = volume_to_world.inverse();
-        let (scalar_min, scalar_max) = volume.scalar_range();
 
         Self {
             world_to_volume: world_to_volume.as_mat4().to_cols_array_2d(),
             volume_to_world: volume_to_world.as_mat4().to_cols_array_2d(),
-            dimensions: [
-                dimensions.x as f32,
-                dimensions.y as f32,
-                dimensions.z as f32,
-            ],
+            dimensions: [dimensions_f64.x as f32, dimensions_f64.y as f32, dimensions_f64.z as f32],
             spacing: [spacing.x as f32, spacing.y as f32, spacing.z as f32],
-            scalar_range: [scalar_min as f32, scalar_max as f32],
+            scalar_range: [scalar_range.0 as f32, scalar_range.1 as f32],
         }
     }
 }
@@ -390,6 +419,60 @@ impl VolumeRenderer {
         ));
         self.volume_metadata = Some(VolumeMetadata::from_volume(volume));
         self.rebuild_bind_groups();
+    }
+
+    /// Allocate an empty 3D volume texture for progressive slice uploads.
+    pub fn allocate_volume(
+        &mut self,
+        dimensions: glam::UVec3,
+        spacing: DVec3,
+        origin: DVec3,
+        direction: DMat3,
+        scalar_range: (f64, f64),
+        linear_interpolation: bool,
+    ) {
+        self.volume_texture = Some(GpuVolumeTexture::allocate_empty(
+            &self.device,
+            dimensions,
+            linear_interpolation,
+        ));
+        self.volume_metadata = Some(VolumeMetadata::from_parts(
+            dimensions,
+            spacing,
+            origin,
+            direction,
+            scalar_range,
+        ));
+        self.rebuild_bind_groups();
+    }
+
+    /// Update one signed 16-bit volume slice inside an already allocated texture.
+    pub fn update_volume_slice_i16(
+        &mut self,
+        z_index: u32,
+        pixels: &[i16],
+        scalar_range: (f64, f64),
+    ) -> Result<(), RenderError> {
+        let texture = self.volume_texture.as_ref().ok_or(RenderError::NoVolume)?;
+        if z_index >= texture.dimensions.z {
+            return Err(RenderError::SliceOutOfBounds {
+                z_index,
+                depth: texture.dimensions.z,
+            });
+        }
+        let expected = (texture.dimensions.x * texture.dimensions.y) as usize;
+        if pixels.len() != expected {
+            return Err(RenderError::SliceLengthMismatch {
+                z_index,
+                expected,
+                actual: pixels.len(),
+            });
+        }
+        texture.update_i16_slice(&self.queue, z_index, pixels);
+        if let Some(metadata) = self.volume_metadata.as_mut() {
+            metadata.scalar_range = [scalar_range.0 as f32, scalar_range.1 as f32];
+        }
+        Ok(())
     }
 
     /// Upload a baked transfer-function LUT to the GPU.
